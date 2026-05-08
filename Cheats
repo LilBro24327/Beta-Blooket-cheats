@@ -1,0 +1,79 @@
+(async () => {
+    // 1. HELPERS: Easy element creation
+    function cE(type, props = {}, ...children) {
+        const el = document.createElement(type);
+        for (let key in props) {
+            if (key === 'style' && typeof props[key] === 'object') {
+                Object.assign(el.style, props[key]);
+            } else {
+                el[key] = props[key];
+            }
+        }
+        children.forEach(child => el.append(child));
+        return el;
+    }
+
+    // 2. THEME & SETTINGS: Keeping your UI logic clean
+    const settings = {
+        data: JSON.parse(localStorage.getItem("JODGUISettings") || "{}"),
+        save() { localStorage.setItem("JODGUISettings", JSON.stringify(this.data)); }
+    };
+
+    // 3. UI STYLE: Basic layout styles
+    const style = cE("style", {
+        innerHTML: `
+            #BlankGUI {
+                position: fixed; top: 10%; left: 10%; width: 800px; height: 500px;
+                background: #0bc2cf; border: 3px solid #333; border-radius: 15px;
+                z-index: 10000; display: flex; font-family: 'Nunito', sans-serif; overflow: hidden;
+            }
+            .sidebar { width: 200px; background: #9a49aa; display: flex; flex-direction: column; }
+            .tab-btn { padding: 15px; color: white; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.1); }
+            .tab-btn:hover { background: rgba(255,255,255,0.1); }
+            .content { flex: 1; background: #40115f; padding: 20px; color: white; overflow-y: auto; }
+            .cheat-card { background: #7a039d; padding: 10px; margin: 10px 0; border-radius: 8px; cursor: pointer; text-align: center; }
+        `
+    });
+    document.head.appendChild(style);
+
+    // 4. GUI CONSTRUCTION
+    const contentArea = cE("div", { className: "content" });
+    const sidebar = cE("div", { className: "sidebar" });
+    const gui = cE("div", { id: "BlankGUI" }, sidebar, contentArea);
+
+    // 5. CHEAT TABS: Define your categories and functions here
+    const tabs = {
+        "Global": () => {
+            contentArea.innerHTML = "<h1>Global Functions</h1>";
+            addFunction("Toggle Auto-Play", () => console.log("Auto-play logic goes here"));
+        },
+        "Game Specific": () => {
+            contentArea.innerHTML = "<h1>Game Mode Functions</h1>";
+            addFunction("Add Gold", () => alert("Gold function logic needed"));
+        },
+        "Settings": () => {
+            contentArea.innerHTML = "<h1>Settings</h1>";
+            addFunction("Close Menu", () => gui.remove());
+        }
+    };
+
+    function addFunction(name, callback) {
+        const btn = cE("div", { className: "cheat-card", innerText: name, onclick: callback });
+        contentArea.append(btn);
+    }
+
+    // Initialize Sidebar
+    Object.keys(tabs).forEach(name => {
+        sidebar.append(cE("div", { 
+            className: "tab-btn", 
+            innerText: name, 
+            onclick: () => tabs[name]() 
+        }));
+    });
+
+    // Default view
+    tabs["Global"]();
+    document.body.appendChild(gui);
+
+    console.log("%c GUI Ready %c Use the tabs to navigate.", "color: #0bc2cf; font-size: 2rem", "color: #fff");
+})();
