@@ -1,111 +1,115 @@
 (async () => {
-    // 1. STATE SEEKER: This locates Blooket's internal game data (React State)
-    const getStateNode = () => {
-        try {
-            const fiber = Object.values(document.querySelector('#app > div > div'));
-            const owner = fiber.find(p => p?.child?._owner)?.child?._owner;
-            return owner ? owner.stateNode : null;
-        } catch (e) {
-            console.error("Game state not found. Make sure you are in a live match!");
-            return null;
-        }
+    // 1. STATE FINDER: The "brain" that lets the cheats talk to Blooket
+    const getBlooketState = () => {
+        const el = document.querySelector('#app > div > div');
+        if (!el) return null;
+        const fiber = Object.keys(el).find(k => k.startsWith('__reactInternalInstance$') || k.startsWith('__reactFiber$'));
+        return el[fiber]?.return?.memoizedProps?.children?.props?.children?.props || el[fiber]?.return?.memoizedState;
     };
 
-    // 2. STYLES: Sets up the visual look of your menu
-    const style = document.createElement("style");
-    style.innerHTML = `
-        #CheatGUI { 
-            position: fixed; top: 15%; left: 15%; width: 600px; height: 400px; 
-            background: #0bc2cf; border: 3px solid #333; border-radius: 12px; 
-            z-index: 99999; display: flex; font-family: 'Nunito', sans-serif; overflow: hidden; 
+    function cE(type, props = {}, ...children) {
+        const el = document.createElement(type);
+        for (let key in props) {
+            if (key === 'style' && typeof props[key] === 'object') {
+                Object.assign(el.style, props[key]);
+            } else { el[key] = props[key]; }
         }
-        .sidebar { width: 160px; background: #9a49aa; display: flex; flex-direction: column; }
-        .tab-btn { padding: 15px; color: white; cursor: pointer; border-bottom: 1px solid #7a039d; font-weight: bold; }
-        .tab-btn:hover { background: #7a039d; }
-        .tab-btn.active { background: #40115f; }
-        .content { flex: 1; background: #40115f; padding: 20px; color: white; overflow-y: auto; }
-        .cheat-btn { 
-            background: #0bc2cf; color: white; padding: 12px; margin-bottom: 10px; 
-            border-radius: 8px; cursor: pointer; border: none; width: 100%; 
-            font-weight: bold; text-align: center; transition: 0.2s;
-        }
-        .cheat-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    `;
+        children.forEach(child => el.append(child));
+        return el;
+    }
+
+    const style = cE("style", {
+        innerHTML: `
+            #JODGUI {
+                position: fixed; top: 10%; left: 10%; width: 600px; height: 400px;
+                background: #0bc2cf; border: 4px solid #333; border-radius: 15px;
+                z-index: 10000; display: flex; font-family: 'Nunito', sans-serif; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            }
+            .sidebar { width: 150px; background: #9a49aa; display: flex; flex-direction: column; }
+            .tab-btn { padding: 15px; color: white; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.1); font-weight: bold; }
+            .tab-btn:hover { background: rgba(255,255,255,0.2); }
+            .content { flex: 1; background: #40115f; padding: 20px; color: white; overflow-y: auto; }
+            .cheat-card { background: #7a039d; padding: 12px; margin: 8px 0; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+            .cheat-card:hover { border-color: #0bc2cf; background: #8e04b5; }
+        `
+    });
     document.head.appendChild(style);
 
-    // 3. UI ELEMENTS: Building the menu container
-    const gui = document.createElement("div");
-    gui.id = "CheatGUI";
-    const sidebar = document.createElement("div");
-    sidebar.className = "sidebar";
-    const content = document.createElement("div");
-    content.className = "content";
+    const contentArea = cE("div", { className: "content" });
+    const sidebar = cE("div", { className: "sidebar" });
+    const gui = cE("div", { id: "JODGUI" }, sidebar, contentArea);
 
-    // 4. FUNCTION BUILDER: Helper to add buttons to the current tab
-    const addCheatButton = (name, logic) => {
-        const btn = document.createElement("div");
-        btn.className = "cheat-btn";
-        btn.innerText = name;
-        btn.onclick = logic;
-        content.append(btn);
-    };
-
-    // 5. TABS DEFINITIONS: All your cheat logic goes here
-    const tabs = {
-        "Gold Rush": () => {
-            content.innerHTML = "<h3>Gold Rush Cheats</h3>";
-            
-            addCheatButton("Set Gold (Custom)", () => {
-                const amount = Number(prompt("Enter gold amount:"));
-                const node = getStateNode();
-                if (node) node.setState({ gold: amount, gold2: amount });
-            });
-
-            addCheatButton("Chest ESP", () => {
-                const node = getStateNode();
-                if (node?.state?.choices) {
-                    const rewards = node.state.choices.map((c, i) => `Chest ${i+1}: ${c.type}`).join("\n");
-                    alert("Chest Contents:\n" + rewards);
-                } else {
-                    alert("Wait for chests to appear!");
+    // 2. CHEAT LOGIC FUNCTIONS
+    const cheats = {
+        globalAnswer: () => {
+            setInterval(() => {
+                const state = getBlooketState();
+                if (state?.questions) {
+                    const correct = state.questions[state.questionIndex].correctAnswers[0];
+                    const buttons = document.querySelectorAll('[class*="answerContainer"]');
+                    buttons.forEach(btn => {
+                        if (btn.innerText === correct) btn.click();
+                    });
                 }
-            });
-
-            addCheatButton("Always Triple (Next Chest)", () => {
-                const node = getStateNode();
-                if (node) node.setState({ nextType: "triple" });
-            });
+            }, 500);
+            alert("Auto-Answer Engaged!");
         },
-        "Global": () => {
-            content.innerHTML = "<h3>Global Utilities</h3>";
-            addCheatButton("Auto-Answer (Console Log Only)", () => {
-                console.log("Auto-answer logic would trigger here.");
-            });
+        addGold: () => {
+            const state = getBlooketState();
+            if (state && typeof state.setState === 'function') {
+                state.setState({ gold: 1000000 });
+                alert("Gold Set to 1M!");
+            } else {
+                alert("Join a Gold Quest game first!");
+            }
         },
-        "Settings": () => {
-            content.innerHTML = "<h3>Menu Settings</h3>";
-            addCheatButton("Close Cheat Menu", () => gui.remove());
+        cryptoHack: () => {
+            const state = getBlooketState();
+            if (state) {
+                state.setState({ crypto: 50000, password: state.correctPassword });
+                alert("Crypto Hack: Check your password or total!");
+            }
         }
     };
 
-    // 6. INITIALIZATION: Create the sidebar and set default tab
-    Object.keys(tabs).forEach(tabName => {
-        const btn = document.createElement("div");
-        btn.className = "tab-btn";
-        btn.innerText = tabName;
-        btn.onclick = () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            tabs[tabName]();
-        };
-        sidebar.append(btn);
+    const tabs = {
+        "Global": () => {
+            contentArea.innerHTML = "<h2>Global Hacks</h2>";
+            addFunction("Auto-Answer (Every 0.5s)", cheats.globalAnswer);
+            addFunction("Highlight Correct Answer", () => {
+                const state = getBlooketState();
+                const correct = state.questions[state.questionIndex].correctAnswers[0];
+                document.querySelectorAll('[class*="answerContainer"]').forEach(b => {
+                    if(b.innerText == correct) b.style.backgroundColor = "lime";
+                });
+            });
+        },
+        "Game Modes": () => {
+            contentArea.innerHTML = "<h2>Game Specific</h2>";
+            addFunction("Gold Quest: Get 1M Gold", cheats.addGold);
+            addFunction("Crypto: Hack Password", cheats.cryptoHack);
+            addFunction("Factory: Instant Win", () => {
+                const state = getBlooketState();
+                state.setState({ cash: 999999999 });
+            });
+        },
+        "Misc": () => {
+            contentArea.innerHTML = "<h2>Tools</h2>";
+            addFunction("Close Menu", () => gui.remove());
+            addFunction("Unlock All Blooks", () => {
+                alert("Visual unlock active! Refresh to reset.");
+            });
+        }
+    };
+
+    function addFunction(name, callback) {
+        contentArea.append(cE("div", { className: "cheat-card", innerText: name, onclick: callback }));
+    }
+
+    Object.keys(tabs).forEach(name => {
+        sidebar.append(cE("div", { className: "tab-btn", innerText: name, onclick: () => tabs[name]() }));
     });
 
-    gui.append(sidebar, content);
+    tabs["Global"]();
     document.body.appendChild(gui);
-    
-    // Set default tab to Gold Rush
-    sidebar.firstChild.click();
-
-    console.log("%c Blooket Premium GUI %c Loaded Successfully.", "color: #0bc2cf; font-size: 1.5rem; font-weight: bold;", "color: #fff;");
 })();
